@@ -1,0 +1,1 @@
+var e=`/rive-playground/playground/assets/rive-BUBNNRcT.wasm`;export{e as default};

@@ -5,6 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rive Playground — Inspect, Control & Export Rive Animations</title>
   <meta name="description" content="Open-source toolkit to inspect, validate, and control Rive .riv animation files from CLI, AI assistants, or a visual playground.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="./logo.svg">
+
+  <!-- OpenGraph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Rive Playground — Inspect, Control & Export Rive Animations">
+  <meta property="og:description" content="Drop any .riv file, edit ViewModel properties in real-time, export configs as JSON/Markdown. Open-source CLI + MCP server + visual playground for Rive animations.">
+  <meta property="og:url" content="https://nano-step.github.io/rive-playground/">
+  <meta property="og:image" content="https://nano-step.github.io/rive-playground/og-image.svg">
+  <meta property="og:site_name" content="Rive Playground">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Rive Playground — Inspect, Control & Export Rive Animations">
+  <meta name="twitter:description" content="Drop any .riv file, edit ViewModel properties in real-time, export configs. Open-source tool built with @rive-app/react-canvas.">
+  <meta name="twitter:image" content="https://nano-step.github.io/rive-playground/og-image.svg">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -96,9 +114,10 @@
     }
     .nav-logo-mark {
       width: 28px; height: 28px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 8px;
+      border-radius: 6px;
+      overflow: hidden;
     }
+    .nav-logo-mark img { width: 100%; height: 100%; }
     .nav-links { display: flex; gap: 28px; }
     .nav-links a {
       color: var(--text-dim); text-decoration: none; font-size: 14px; font-weight: 500;
@@ -353,7 +372,7 @@
   <div class="container">
     <nav>
       <a href="#" class="nav-logo">
-        <div class="nav-logo-mark"></div>
+        <div class="nav-logo-mark"><img src="./logo.svg" alt="R"></div>
         Rive Playground
       </a>
       <div class="nav-links">

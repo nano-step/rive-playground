@@ -314,6 +314,7 @@
       line-height: 1.7;
       color: var(--text);
       overflow-x: auto;
+      white-space: pre;
     }
     .code-block .kw { color: var(--accent2); }
     .code-block .str { color: #10b981; }
@@ -481,13 +482,14 @@
     <div class="container">
       <h2 class="code-title">Up and running in seconds</h2>
       <div class="code-tabs">
-        <div class="code-tab active">CLI</div>
-        <div class="code-tab">MCP</div>
-        <div class="code-tab">Playground</div>
+        <div class="code-tab active" data-tab="cli">CLI</div>
+        <div class="code-tab" data-tab="mcp">MCP</div>
+        <div class="code-tab" data-tab="playground">Playground</div>
       </div>
-      <div class="code-block">
-<span class="comment"># Install & build</span>
-npm install && npm run build
+
+      <div class="code-block" data-panel="cli">
+<span class="comment"># Install &amp; build</span>
+npm install &amp;&amp; npm run build
 
 <span class="comment"># Inspect a .riv file</span>
 node dist/cli.js inspect animation.riv
@@ -500,10 +502,64 @@ node dist/cli.js inspect animation.riv
     State Machines (<span class="num">1</span>):
       - State Machine 1
           [<span class="kw">trigger</span>] RESET
-          [<span class="kw">boolean</span>] Mouse InFrame
-      </div>
+          [<span class="kw">boolean</span>] Mouse InFrame</div>
+
+      <div class="code-block" data-panel="mcp" style="display:none;">
+<span class="comment"># Start MCP server</span>
+node dist/mcp.js
+
+<span class="comment"># Add to Claude Desktop config:</span>
+<span class="comment"># ~/Library/Application Support/Claude/claude_desktop_config.json</span>
+{
+  <span class="str">"mcpServers"</span>: {
+    <span class="str">"rive-analyzer"</span>: {
+      <span class="str">"command"</span>: <span class="str">"node"</span>,
+      <span class="str">"args"</span>: [<span class="str">"/path/to/dist/mcp.js"</span>]
+    }
+  }
+}
+
+<span class="comment"># 5 tools available:</span>
+  <span class="fn">inspect-rive</span>         Analyze a single .riv file
+  <span class="fn">scan-rive-files</span>      Find all .riv in a directory
+  <span class="fn">validate-rive-config</span> Compare .riv with JS/TS config
+  <span class="fn">generate-rive-types</span>  Generate TypeScript constants
+  <span class="fn">watch-rive-files</span>     Watch for file changes</div>
+
+      <div class="code-block" data-panel="playground" style="display:none;">
+<span class="comment"># Start the visual playground</span>
+<span class="kw">cd</span> playground
+npm install
+npm run dev
+
+<span class="comment"># Open in browser</span>
+<span class="fn">http://localhost:5173</span>
+
+<span class="comment"># Or try the hosted version:</span>
+<span class="fn">https://nano-step.github.io/rive-playground/playground/</span>
+
+<span class="comment"># Features:</span>
+  🎨 Drag &amp; drop .riv files
+  🔧 Edit ViewModel properties in real-time
+  🎛️ Control state machine inputs
+  🖼️ Map images via URL or upload
+  📤 Export config as JSON / Markdown
+  🔍 Zoom (Ctrl+Scroll) &amp; Pan (Alt+Drag)</div>
     </div>
   </section>
+
+  <script>
+    document.querySelectorAll('.code-tab').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        var target = this.getAttribute('data-tab');
+        document.querySelectorAll('.code-tab').forEach(function(t) { t.classList.remove('active'); });
+        document.querySelectorAll('.code-block[data-panel]').forEach(function(p) { p.style.display = 'none'; });
+        this.classList.add('active');
+        var panel = document.querySelector('.code-block[data-panel="' + target + '"]');
+        if (panel) panel.style.display = 'block';
+      });
+    });
+  </script>
 
   <footer>
     <div class="container">

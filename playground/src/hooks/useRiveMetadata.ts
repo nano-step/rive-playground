@@ -37,7 +37,7 @@ type RiveRuntime = {
 
 let riveRuntime: RiveRuntime | null = null;
 
-async function getRiveRuntime(): Promise<RiveRuntime> {
+export async function getRiveRuntime(): Promise<RiveRuntime> {
   if (riveRuntime) return riveRuntime;
 
   const [mod, wasmUrlMod] = await Promise.all([

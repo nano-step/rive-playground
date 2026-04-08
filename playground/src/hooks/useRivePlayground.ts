@@ -6,6 +6,7 @@ import type {
   SMInput,
   TextRunEntry,
   ViewModelProperty,
+  RiveEvent,
 } from "../types";
 import { SM_INPUT_NUMBER, SM_INPUT_BOOLEAN, SM_INPUT_TRIGGER } from "../types";
 import { useRiveMetadata } from "./useRiveMetadata";
@@ -22,7 +23,10 @@ const INITIAL_STATE: PlaygroundState = {
   smInputs: [],
   textRuns: [],
   viewModelProps: [],
+  riveEvents: [],
 };
+
+let _eventIdCounter = 0;
 
 export function useRivePlayground() {
   const [state, setState] = useState<PlaygroundState>(INITIAL_STATE);
@@ -33,10 +37,16 @@ export function useRivePlayground() {
   const [riveBuffer, setRiveBuffer] = useState<ArrayBuffer | null>(null);
   const riveRef = useRef<Rive | null>(null);
   const selectedSMRef = useRef("");
+  const selectedArtboardRef = useRef("");
   const vmInstanceRef = useRef<Record<string, unknown> | null>(null);
   const vmPropsCache = useRef<Map<string, Record<string, unknown>>>(new Map());
   const textRunNamesRef = useRef<string[]>([]);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingPresetRef = useRef<{
+    inputs: Array<{ name: string; type: string; value: unknown }>;
+    viewModelProps: Array<{ path: string; type: string; value: unknown }>;
+    textRuns: Array<{ name: string; value: string }>;
+  } | null>(null);
 
   const clearLoadTimeout = useCallback(() => {
     if (loadTimeoutRef.current) {
@@ -103,6 +113,7 @@ export function useRivePlayground() {
   const metadataReady = metadataArtboards.length > 0 && !!state.selectedArtboard;
 
   selectedSMRef.current = state.selectedStateMachine;
+  selectedArtboardRef.current = state.selectedArtboard;
 
   const extractLiveData = useCallback(() => {
     const rive = riveRef.current;
@@ -123,7 +134,7 @@ export function useRivePlayground() {
         }));
       } catch {}
 
-      const textRuns: TextRunEntry[] = [];
+      let textRuns: TextRunEntry[] = [];
       for (const name of textRunNamesRef.current) {
         try {
           const val = rive.getTextRunValue(name);
@@ -227,6 +238,49 @@ export function useRivePlayground() {
         }
       } catch {}
 
+      const pending = pendingPresetRef.current;
+      if (pending) {
+        pendingPresetRef.current = null;
+        const rive = riveRef.current;
+        if (rive) {
+          try {
+            const rawInputs = rive.stateMachineInputs(selectedSMRef.current);
+            for (const inp of pending.inputs) {
+              const found = rawInputs?.find((i) => i.name === inp.name);
+              if (found) found.value = inp.value as number | boolean;
+            }
+            smInputs = smInputs.map((i) => {
+              const override = pending.inputs.find((p) => p.name === i.name);
+              return override ? { ...i, value: override.value as number | boolean } : i;
+            });
+          } catch {}
+          for (const tr of pending.textRuns) {
+            try { rive.setTextRunValue(tr.name, tr.value); } catch {}
+          }
+          textRuns = textRuns.map((t) => {
+            const override = pending.textRuns.find((p) => p.name === t.name);
+            return override ? { ...t, value: override.value } : t;
+          });
+        }
+        for (const vp of pending.viewModelProps) {
+          const cached = vmPropsCache.current.get(vp.path);
+          if (cached && "value" in cached) {
+            try { (cached as { value: unknown }).value = vp.value; } catch {}
+          }
+          viewModelProps = viewModelProps.map((p) => {
+            if (p.path === vp.path) return { ...p, value: vp.value as string | number | boolean };
+            if (p.children) {
+              return {
+                ...p, children: p.children.map((c) =>
+                  c.path === vp.path ? { ...c, value: vp.value as string | number | boolean } : c
+                ),
+              };
+            }
+            return p;
+          });
+        }
+      }
+
       setState((prev) => ({
         ...prev,
         smInputs,
@@ -234,6 +288,20 @@ export function useRivePlayground() {
         viewModelProps,
       }));
     } catch {}
+  }, []);
+
+  const addRiveEvent = useCallback((name: string, type: "general" | "openUrl", properties?: Record<string, unknown>, url?: string) => {
+    const now = new Date();
+    const ts = now.toLocaleTimeString("en-US", { hour12: false }) + "." + String(now.getMilliseconds()).padStart(3, "0");
+    const event: RiveEvent = { id: ++_eventIdCounter, timestamp: ts, name, type, properties, url };
+    setState((prev) => ({
+      ...prev,
+      riveEvents: [event, ...prev.riveEvents].slice(0, 50),
+    }));
+  }, []);
+
+  const clearEvents = useCallback(() => {
+    setState((prev) => ({ ...prev, riveEvents: [] }));
   }, []);
 
   const onRiveReady = useCallback(
@@ -246,9 +314,25 @@ export function useRivePlayground() {
         isLoaded: true,
         error: null,
       }));
-      setTimeout(extractLiveData, 500);
+      try {
+        const riveAny = rive as unknown as Record<string, unknown>;
+        const onFn = riveAny["on"] as ((event: string, cb: (e: unknown) => void) => void) | undefined;
+        if (onFn) {
+          onFn.call(rive, "RiveEvent", (e: unknown) => {
+            const ev = e as Record<string, unknown>;
+            const data = (ev["data"] as Record<string, unknown>) ?? ev;
+            const evName = (data["name"] as string) ?? "event";
+            const isOpenUrl = !!(data["url"]);
+            const evType: "openUrl" | "general" = isOpenUrl ? "openUrl" : "general";
+            const props = (data["properties"] as Record<string, unknown>) ?? undefined;
+            addRiveEvent(evName, evType, props, data["url"] as string | undefined);
+          });
+        }
+      } catch {}
+      const readyTimer = setTimeout(extractLiveData, 500);
+      return () => clearTimeout(readyTimer);
     },
-    [clearLoadTimeout, extractLiveData],
+    [clearLoadTimeout, extractLiveData, addRiveEvent],
   );
 
   useEffect(() => {
@@ -277,9 +361,18 @@ export function useRivePlayground() {
     });
     setRiveSource({ src: url });
     fetch(url)
-      .then((res) => res.arrayBuffer())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        return res.arrayBuffer();
+      })
       .then((buf) => setRiveBuffer(buf))
-      .catch(() => {});
+      .catch((err: Error) => {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: `Failed to load file: ${err.message}`,
+        }));
+      });
   }, []);
 
   const selectArtboard = useCallback((name: string) => {
@@ -460,6 +553,88 @@ export function useRivePlayground() {
     setResetCounter((c) => c + 1);
   }, []);
 
+  const applyPreset = useCallback((preset: {
+    artboard: string;
+    stateMachine: string;
+    inputs: Array<{ name: string; type: string; value: unknown }>;
+    viewModelProps: Array<{ path: string; type: string; value: unknown }>;
+    textRuns: Array<{ name: string; value: string }>;
+  }) => {
+    pendingPresetRef.current = {
+      inputs: preset.inputs,
+      viewModelProps: preset.viewModelProps,
+      textRuns: preset.textRuns,
+    };
+
+    const rive = riveRef.current;
+    const currentArtboard = selectedArtboardRef.current;
+    const currentSM = selectedSMRef.current;
+    const needsRemount =
+      preset.artboard !== currentArtboard ||
+      preset.stateMachine !== currentSM;
+
+    if (rive) {
+      try {
+        const smName = needsRemount ? preset.stateMachine : currentSM;
+        const rawInputs = rive.stateMachineInputs(smName || currentSM);
+        for (const inp of preset.inputs) {
+          const found = rawInputs?.find((i) => i.name === inp.name);
+          if (found) found.value = inp.value as number | boolean;
+        }
+      } catch {}
+
+      for (const tr of preset.textRuns) {
+        try { rive.setTextRunValue(tr.name, tr.value); } catch {}
+      }
+
+      for (const vp of preset.viewModelProps) {
+        const cached = vmPropsCache.current.get(vp.path);
+        if (cached && "value" in cached) {
+          try { (cached as { value: unknown }).value = vp.value; } catch {}
+        }
+      }
+
+      const applyVmOverrides = (props: ViewModelProperty[]): ViewModelProperty[] =>
+        props.map((p) => {
+          const override = preset.viewModelProps.find((vp) => vp.path === p.path);
+          if (override) return { ...p, value: override.value as string | number | boolean };
+          if (p.children) return { ...p, children: applyVmOverrides(p.children) };
+          return p;
+        });
+
+      setState((prev) => ({
+        ...prev,
+        selectedArtboard: preset.artboard,
+        selectedStateMachine: preset.stateMachine,
+        smInputs: prev.smInputs.map((i) => {
+          const override = preset.inputs.find((p) => p.name === i.name);
+          return override ? { ...i, value: override.value as number | boolean } : i;
+        }),
+        textRuns: prev.textRuns.map((t) => {
+          const override = preset.textRuns.find((p) => p.name === t.name);
+          return override ? { ...t, value: override.value } : t;
+        }),
+        viewModelProps: applyVmOverrides(prev.viewModelProps),
+      }));
+
+      if (needsRemount) {
+        riveRef.current = null;
+        setResetCounter((c) => c + 1);
+      } else {
+        pendingPresetRef.current = null;
+      }
+    } else {
+      setState((prev) => ({
+        ...prev,
+        selectedArtboard: preset.artboard,
+        selectedStateMachine: preset.stateMachine,
+        smInputs: [],
+      }));
+      riveRef.current = null;
+      setResetCounter((c) => c + 1);
+    }
+  }, []);
+
   return {
     state,
     riveSource,
@@ -478,5 +653,7 @@ export function useRivePlayground() {
     playAnimation,
     pauseAnimation,
     resetAnimation,
+    clearEvents,
+    applyPreset,
   };
 }

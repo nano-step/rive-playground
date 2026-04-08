@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 interface Props {
   name: string;
@@ -12,6 +12,16 @@ export function ImageControl({ name, imageUrl, onSetUrl, onSetFile }: Props) {
   const [previewSrc, setPreviewSrc] = useState<string | undefined>(imageUrl);
   const [loading, setLoading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const handleUrlSubmit = useCallback(() => {
     const trimmed = urlInput.trim();
@@ -28,15 +38,21 @@ export function ImageControl({ name, imageUrl, onSetUrl, onSetFile }: Props) {
       const file = e.target.files?.[0];
       if (!file) return;
       setLoading(true);
-      setPreviewSrc(URL.createObjectURL(file));
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+      const blobUrl = URL.createObjectURL(file);
+      blobUrlRef.current = blobUrl;
+      setPreviewSrc(blobUrl);
       const reader = new FileReader();
       reader.onload = () => {
         if (reader.result instanceof ArrayBuffer) {
           onSetFile(reader.result);
         }
         setLoading(false);
+        e.target.value = "";
       };
-      reader.onerror = () => setLoading(false);
+      reader.onerror = () => { setLoading(false); e.target.value = ""; };
       reader.readAsArrayBuffer(file);
     },
     [onSetFile],

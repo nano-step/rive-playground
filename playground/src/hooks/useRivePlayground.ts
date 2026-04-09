@@ -7,6 +7,7 @@ import type {
   TextRunEntry,
   ViewModelProperty,
   RiveEvent,
+  ListAction,
 } from "../types";
 import { SM_INPUT_NUMBER, SM_INPUT_BOOLEAN, SM_INPUT_TRIGGER } from "../types";
 import { useRiveMetadata } from "./useRiveMetadata";
@@ -42,6 +43,7 @@ export function useRivePlayground() {
   const vmPropsCache = useRef<Map<string, Record<string, unknown>>>(new Map());
   const textRunNamesRef = useRef<string[]>([]);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const extractTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingPresetRef = useRef<{
     inputs: Array<{ name: string; type: string; value: unknown }>;
     viewModelProps: Array<{ path: string; type: string; value: unknown }>;
@@ -181,6 +183,7 @@ export function useRivePlayground() {
           viewModel(n: string): VmInst | null;
           image(n: string): Record<string, unknown> | null;
           trigger(n: string): Record<string, unknown> | null;
+          list(n: string): Record<string, unknown> | null;
           [k: string]: unknown;
         };
 
@@ -199,31 +202,69 @@ export function useRivePlayground() {
               path,
             };
             try {
-              const typeKey = p.type === "enumType" ? "enum" : p.type;
-              const fn = inst[typeKey] as ((n: string) => Record<string, unknown> | null) | undefined;
-              const prop = fn?.call(inst, p.name);
-              if (prop) {
-                vmPropsCache.current.set(path, prop);
-                if (p.type === "enumType") {
-                  entry.value = prop["value"] as string;
-                  entry.enumValues = (prop["values"] as string[]) ?? [];
-                } else if (
-                  p.type === "string" ||
-                  p.type === "number" ||
-                  p.type === "boolean" ||
-                  p.type === "color"
-                ) {
-                  entry.value = prop["value"] as string | number | boolean;
-                } else if (p.type === "image") {
-                  entry.imageUrl =
-                    (prop["url"] as string | undefined) ?? undefined;
-                } else if (p.type === "viewModel") {
-                  const childInst = prop as VmInst;
-                  if (
-                    childInst &&
-                    typeof childInst["properties"] !== "undefined"
+              if (p.type === "list") {
+                const listProp = inst.list(p.name);
+                if (listProp) {
+                  vmPropsCache.current.set(path, listProp);
+                  const rawLen = listProp["length"];
+                  const len = typeof rawLen === "function"
+                    ? (rawLen as () => number).call(listProp)
+                    : (rawLen as number) ?? 0;
+
+                  const listItemChildren: ViewModelProperty[] = [];
+                  let discoveredType = "";
+
+                  for (let i = 0; i < len; i++) {
+                    const itemInst = (
+                      listProp["instanceAt"] as ((i: number) => VmInst | null) | undefined
+                    )?.call(listProp, i);
+                    if (!itemInst) continue;
+
+                    const itemPath = `${path}[${i}]`;
+                    vmPropsCache.current.set(itemPath, itemInst as Record<string, unknown>);
+
+                    if (i === 0) {
+                      discoveredType = (itemInst["viewModelName"] as string | undefined) ?? "";
+                    }
+
+                    listItemChildren.push({
+                      name: `Item ${i}`,
+                      type: "listItem",
+                      path: itemPath,
+                      children: readInstance(itemInst, itemPath),
+                    });
+                  }
+
+                  entry.children = listItemChildren;
+                  entry.listItemType = discoveredType;
+                }
+              } else {
+                const typeKey = p.type === "enumType" ? "enum" : p.type;
+                const fn = inst[typeKey] as ((n: string) => Record<string, unknown> | null) | undefined;
+                const prop = fn?.call(inst, p.name);
+                if (prop) {
+                  vmPropsCache.current.set(path, prop);
+                  if (p.type === "enumType") {
+                    entry.value = prop["value"] as string;
+                    entry.enumValues = (prop["values"] as string[]) ?? [];
+                  } else if (
+                    p.type === "string" ||
+                    p.type === "number" ||
+                    p.type === "boolean" ||
+                    p.type === "color"
                   ) {
-                    entry.children = readInstance(childInst, path);
+                    entry.value = prop["value"] as string | number | boolean;
+                  } else if (p.type === "image") {
+                    entry.imageUrl =
+                      (prop["url"] as string | undefined) ?? undefined;
+                  } else if (p.type === "viewModel") {
+                    const childInst = prop as VmInst;
+                    if (
+                      childInst &&
+                      typeof childInst["properties"] !== "undefined"
+                    ) {
+                      entry.children = readInstance(childInst, path);
+                    }
                   }
                 }
               }
@@ -513,6 +554,69 @@ export function useRivePlayground() {
     [],
   );
 
+  const findListNode = useCallback(
+    (props: ViewModelProperty[], targetPath: string): ViewModelProperty | undefined => {
+      for (const p of props) {
+        if (p.path === targetPath && p.type === "list") return p;
+        if (p.children) {
+          const found = findListNode(p.children, targetPath);
+          if (found) return found;
+        }
+      }
+      return undefined;
+    },
+    [],
+  );
+
+  const scheduleExtract = useCallback(() => {
+    if (extractTimerRef.current) clearTimeout(extractTimerRef.current);
+    extractTimerRef.current = setTimeout(extractLiveData, 50);
+  }, [extractLiveData]);
+
+  const performListAction = useCallback(
+    (action: ListAction, currentViewModelProps: ViewModelProperty[]) => {
+      const listPath = action.listPath;
+      const listProp = vmPropsCache.current.get(listPath);
+      if (!listProp) return;
+
+      try {
+        if (action.action === "remove") {
+          (listProp["removeInstanceAt"] as ((i: number) => void) | undefined)
+            ?.call(listProp, action.index);
+        } else if (action.action === "swap") {
+          (listProp["swap"] as ((a: number, b: number) => void) | undefined)
+            ?.call(listProp, action.indexA, action.indexB);
+        } else if (action.action === "add") {
+          const listNode = findListNode(currentViewModelProps, listPath);
+          const typeName = listNode?.listItemType ?? "";
+          const riveAny = riveRef.current as unknown as Record<string, unknown> | null;
+          const vmByName = riveAny?.["viewModelByName"] as
+            | ((n: string) => Record<string, unknown> | null)
+            | undefined;
+          const vmDef = typeName ? vmByName?.call(riveRef.current, typeName) : null;
+          const defaultInstFn = vmDef
+            ? (vmDef["defaultInstance"] as (() => Record<string, unknown> | null) | undefined)
+            : undefined;
+          const newInst = defaultInstFn?.call(vmDef);
+          if (newInst) {
+            (listProp["addInstance"] as ((i: Record<string, unknown>) => void) | undefined)
+              ?.call(listProp, newInst);
+          }
+        }
+      } catch {}
+
+      const prefix = `${listPath}[`;
+      for (const key of Array.from(vmPropsCache.current.keys())) {
+        if (key === listPath || key.startsWith(prefix)) {
+          vmPropsCache.current.delete(key);
+        }
+      }
+
+      scheduleExtract();
+    },
+    [findListNode, scheduleExtract],
+  );
+
   const setTextRunValue = useCallback(
     (name: string, value: string) => {
       const rive = riveRef.current;
@@ -669,6 +773,7 @@ export function useRivePlayground() {
     setSMInputValue,
     fireSMTrigger,
     setViewModelProp,
+    performListAction,
     setTextRunValue,
     addTextRunName,
     playAnimation,

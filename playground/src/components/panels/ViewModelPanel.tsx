@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ViewModelProperty } from "../../types";
+import type { ViewModelProperty, ListAction } from "../../types";
 import { TextControl } from "../controls/TextControl";
 import { NumberControl } from "../controls/NumberControl";
 import { BooleanControl } from "../controls/BooleanControl";
@@ -8,6 +8,7 @@ import { ColorControl } from "../controls/ColorControl";
 import { ImageControl } from "../controls/ImageControl";
 import { TriggerControl } from "../controls/TriggerControl";
 import { TypeBadge } from "../controls/TypeBadge";
+import { ListControl } from "../controls/ListControl";
 
 interface Props {
   properties: ViewModelProperty[];
@@ -16,14 +17,17 @@ interface Props {
     type: string,
     value: string | number | boolean | ArrayBuffer,
   ) => void;
+  onListAction: (action: ListAction) => void;
 }
 
 function ViewModelNode({
   prop,
   onSetProp,
+  onListAction,
 }: {
   prop: ViewModelProperty;
   onSetProp: Props["onSetProp"];
+  onListAction: Props["onListAction"];
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -126,12 +130,78 @@ function ViewModelNode({
           {expanded && prop.children && prop.children.length > 0 && (
             <div className="vm-children">
               {prop.children.map((child) => (
-                <ViewModelNode key={child.path} prop={child} onSetProp={onSetProp} />
+                <ViewModelNode key={child.path} prop={child} onSetProp={onSetProp} onListAction={onListAction} />
               ))}
             </div>
           )}
         </div>
       );
+    case "list":
+      return (
+        <ListControl
+          key={prop.path}
+          prop={prop}
+          onListAction={onListAction}
+          renderChildren={(children) =>
+            children.map((child) => (
+              <ViewModelNode key={child.path} prop={child} onSetProp={onSetProp} onListAction={onListAction} />
+            ))
+          }
+        />
+      );
+    case "listItem": {
+      const pathMatch = /^(.+)\[(\d+)\]$/.exec(prop.path);
+      const listPath = pathMatch?.[1] ?? "";
+      const index = pathMatch ? parseInt(pathMatch[2], 10) : 0;
+      const siblingCount = prop.children?.length ?? 0;
+      void siblingCount;
+      return (
+        <div className="vm-nested vm-list-item" key={prop.path}>
+          <button
+            className="vm-toggle"
+            onClick={() => setExpanded((v) => !v)}
+            type="button"
+          >
+            <TypeBadge type="listItem" />
+            <span>{prop.name}</span>
+            <div className="vm-list-item-actions">
+              <button
+                type="button"
+                className="vm-list-item-btn"
+                onClick={(e) => { e.stopPropagation(); onListAction({ action: "swap", listPath, indexA: index - 1, indexB: index }); }}
+                disabled={index === 0}
+                title="Move up"
+              >↑</button>
+              <button
+                type="button"
+                className="vm-list-item-btn"
+                onClick={(e) => { e.stopPropagation(); onListAction({ action: "swap", listPath, indexA: index, indexB: index + 1 }); }}
+                title="Move down"
+              >↓</button>
+              <button
+                type="button"
+                className="vm-list-item-btn vm-list-item-remove"
+                onClick={(e) => { e.stopPropagation(); onListAction({ action: "remove", listPath, index }); }}
+                title="Remove item"
+              >✕</button>
+            </div>
+            <span className="vm-toggle-icon">
+              {expanded
+                ? <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+                : <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M10 7l5 5-5 5z"/></svg>
+              }
+            </span>
+          </button>
+          {expanded && prop.children && prop.children.length > 0 && (
+            <div className="vm-children">
+              {prop.children.map((child) => (
+                <ViewModelNode key={child.path} prop={child} onSetProp={onSetProp} onListAction={onListAction} />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
     default:
       return (
         <div className="input-row" key={prop.path}>
@@ -145,7 +215,7 @@ function ViewModelNode({
   }
 }
 
-export function ViewModelPanel({ properties, onSetProp }: Props) {
+export function ViewModelPanel({ properties, onSetProp, onListAction }: Props) {
   if (properties.length === 0) return null;
 
   return (
@@ -156,7 +226,7 @@ export function ViewModelPanel({ properties, onSetProp }: Props) {
       </div>
       <div className="panel-body">
         {properties.map((prop) => (
-          <ViewModelNode key={prop.path} prop={prop} onSetProp={onSetProp} />
+          <ViewModelNode key={prop.path} prop={prop} onSetProp={onSetProp} onListAction={onListAction} />
         ))}
       </div>
     </div>

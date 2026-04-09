@@ -1,4 +1,4 @@
-import type { PlaygroundState, Preset } from "../types";
+import type { PlaygroundState, Preset, ListAction } from "../types";
 import { ArtboardPanel } from "./panels/ArtboardPanel";
 import { StateMachinePanel } from "./panels/StateMachinePanel";
 import { TextRunPanel } from "./panels/TextRunPanel";
@@ -14,6 +14,7 @@ interface Props {
   onSetInput: (name: string, value: number | boolean) => void;
   onFireTrigger: (name: string) => void;
   onSetViewModelProp: (path: string, type: string, value: string | number | boolean | ArrayBuffer) => void;
+  onListAction: (action: ListAction) => void;
   onSetTextRun: (name: string, value: string) => void;
   onAddTextRun: (name: string) => void;
   onClearEvents: () => void;
@@ -47,6 +48,7 @@ export function Sidebar({
   onSetInput,
   onFireTrigger,
   onSetViewModelProp,
+  onListAction,
   onSetTextRun,
   onAddTextRun,
   onClearEvents,
@@ -94,7 +96,7 @@ export function Sidebar({
               onSetTextRun={onSetTextRun}
               onAddTextRun={onAddTextRun}
             />
-            <ViewModelPanel properties={state.viewModelProps} onSetProp={onSetViewModelProp} />
+            <ViewModelPanel properties={state.viewModelProps} onSetProp={onSetViewModelProp} onListAction={onListAction} />
             <EventsPanel events={state.riveEvents} onClear={onClearEvents} />
             <PresetsPanel
               presets={presets}

@@ -27,6 +27,7 @@ export default function App() {
     setSMInputValue,
     fireSMTrigger,
     setViewModelProp,
+    performListAction,
     setTextRunValue,
     addTextRunName,
     playAnimation,
@@ -35,6 +36,13 @@ export default function App() {
     clearEvents,
     applyPreset,
   } = useRivePlayground();
+
+  const handleListAction = useCallback(
+    (action: Parameters<typeof performListAction>[0]) => {
+      performListAction(action, state.viewModelProps);
+    },
+    [performListAction, state.viewModelProps],
+  );
 
   const { presets, savePreset, deletePreset } = usePresets();
 
@@ -187,6 +195,7 @@ export default function App() {
               onSetInput={setSMInputValue}
               onFireTrigger={fireSMTrigger}
               onSetViewModelProp={setViewModelProp}
+              onListAction={handleListAction}
               onSetTextRun={setTextRunValue}
               onAddTextRun={addTextRunName}
               onClearEvents={clearEvents}

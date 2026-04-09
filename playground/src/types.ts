@@ -39,7 +39,13 @@ export interface ViewModelProperty {
   enumValues?: string[];
   imageUrl?: string;
   children?: ViewModelProperty[];
+  listItemType?: string;
 }
+
+export type ListAction =
+  | { action: "add"; listPath: string }
+  | { action: "remove"; listPath: string; index: number }
+  | { action: "swap"; listPath: string; indexA: number; indexB: number };
 
 export interface RiveEvent {
   id: number;

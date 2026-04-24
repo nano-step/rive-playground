@@ -350,6 +350,37 @@
   transform: scale(0.92);
 }
 
+.playback-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.playback-fit-select {
+  height: 28px;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  outline: none;
+  transition: color var(--transition);
+}
+
+.playback-fit-select:hover {
+  color: var(--text-bright);
+}
+
+.playback-fit-select option {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
 /* ===== FILE LOADER ===== */
 .file-loader {
   padding: 32px;

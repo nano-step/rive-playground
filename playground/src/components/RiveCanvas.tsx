@@ -2,12 +2,26 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { useRive, Layout, Fit, Alignment } from "@rive-app/react-canvas";
 import type { Rive } from "@rive-app/react-canvas";
 
+export type FitMode = "Contain" | "Cover" | "Fill" | "FitWidth" | "FitHeight" | "ScaleDown" | "None" | "Layout";
+
+const FIT_MAP: Record<FitMode, Fit> = {
+  Contain: Fit.Contain,
+  Cover: Fit.Cover,
+  Fill: Fit.Fill,
+  FitWidth: Fit.FitWidth,
+  FitHeight: Fit.FitHeight,
+  ScaleDown: Fit.ScaleDown,
+  None: Fit.None,
+  Layout: Fit.Layout,
+};
+
 interface Props {
   buffer?: ArrayBuffer;
   src?: string;
   artboard?: string;
   stateMachine?: string;
   onRiveReady: (rive: Rive) => void;
+  fitMode?: FitMode;
 }
 
 const MIN_ZOOM = 0.1;
@@ -20,13 +34,14 @@ export function RiveCanvas({
   artboard,
   stateMachine,
   onRiveReady,
+  fitMode = "Contain",
 }: Props) {
   const params = {
     ...(buffer ? { buffer } : { src }),
     artboard: artboard || undefined,
     stateMachines: stateMachine ? [stateMachine] : undefined,
     autoplay: true,
-    layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+    layout: new Layout({ fit: FIT_MAP[fitMode], alignment: Alignment.Center }),
   };
 
   const { rive, RiveComponent } = useRive(params, {

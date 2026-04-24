@@ -7,12 +7,14 @@ import { RiveCanvas } from "./components/RiveCanvas";
 import { Sidebar } from "./components/Sidebar";
 import { PlaybackPanel } from "./components/panels/PlaybackPanel";
 import { Toast } from "./components/Toast";
+import type { FitMode } from "./components/RiveCanvas";
 
 
 import "./App.css";
 
 export default function App() {
   const [dismissedError, setDismissedError] = useState<string | null>(null);
+  const [fitMode, setFitMode] = useState<FitMode>("Contain");
 
   const {
     state,
@@ -163,6 +165,7 @@ export default function App() {
                   artboard={state.selectedArtboard}
                   stateMachine={state.selectedStateMachine}
                   onRiveReady={onRiveReady}
+                  fitMode={fitMode}
                 />
               )}
 
@@ -185,6 +188,8 @@ export default function App() {
                 onPlay={playAnimation}
                 onPause={pauseAnimation}
                 onReset={resetAnimation}
+                fitMode={fitMode}
+                onFitModeChange={setFitMode}
               />
             </div>
 

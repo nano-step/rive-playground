@@ -1,0 +1,20 @@
+name: Publish Stable
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    permissions:
+      contents: write
+    uses: nano-step/shared-workflows/.github/workflows/publish-stable.yml@v1
+    with:
+      package-name: "rive-playground"
+      build-command: "npm run build"
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

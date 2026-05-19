@@ -1,0 +1,19 @@
+name: Publish Beta
+
+on:
+  push:
+    branches: [beta]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    permissions:
+      contents: write
+    uses: nano-step/shared-workflows/.github/workflows/publish-beta.yml@v1
+    with:
+      package-name: "rive-playground"
+      build-command: "npm run build"
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

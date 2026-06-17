@@ -1,0 +1,1 @@
+var e=`/rive-playground/playground/assets/rive-FZ1snv8S.wasm`;export{e as default};

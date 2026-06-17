@@ -374,6 +374,21 @@ export function useRivePlayground() {
           });
         }
       } catch {}
+      const autoPlay = () => {
+        try {
+          const riveAny = rive as unknown as Record<string, unknown>;
+          const activeSMs = riveAny["activeStateMachineNames"] as string[] | undefined;
+          const activeAnims = riveAny["activeAnimationNames"] as string[] | undefined;
+          if (activeSMs?.length) {
+            rive.play(activeSMs[0]);
+          } else if (activeAnims?.length) {
+            rive.play(activeAnims[0]);
+          } else {
+            rive.play();
+          }
+        } catch {}
+      };
+
       if (pendingPresetRef.current) {
         let retryTimer: ReturnType<typeof setTimeout> | null = null;
         const scheduleExtractWithRetry = (attempts: number) => {
@@ -393,6 +408,7 @@ export function useRivePlayground() {
         scheduleExtractWithRetry(0);
         return () => { if (retryTimer) clearTimeout(retryTimer); };
       } else {
+        autoPlay();
         const readyTimer = setTimeout(extractLiveData, 500);
         return () => clearTimeout(readyTimer);
       }

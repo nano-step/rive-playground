@@ -57,6 +57,25 @@ export function RiveCanvas({
     }
   }, [rive, stableOnReady]);
 
+  useEffect(() => {
+    if (!rive) return;
+    rive.layout = new Layout({ fit: FIT_MAP[fitMode], alignment: Alignment.Center });
+    try { rive.resizeDrawingSurfaceToCanvas(); } catch {}
+    rive.startRendering();
+    try {
+      const riveAny = rive as unknown as Record<string, unknown>;
+      const activeSMs = riveAny["activeStateMachineNames"] as string[] | undefined;
+      const activeAnims = riveAny["activeAnimationNames"] as string[] | undefined;
+      if (activeSMs?.length) {
+        rive.play(activeSMs[0]);
+      } else if (activeAnims?.length) {
+        rive.play(activeAnims[0]);
+      } else {
+        rive.play();
+      }
+    } catch {}
+  }, [rive, fitMode]);
+
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);

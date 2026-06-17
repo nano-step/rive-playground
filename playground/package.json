@@ -1,7 +1,7 @@
 {
   "name": "playground",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@rive-app/canvas-advanced": "^2.36.0",
-    "@rive-app/react-canvas": "^4.27.3",
+    "@rive-app/canvas-advanced": "^2.38.1",
+    "@rive-app/react-canvas": "^4.29.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
